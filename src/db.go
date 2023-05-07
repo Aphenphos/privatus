@@ -9,6 +9,7 @@ import (
 )
 
 var defaultDBLocation string = "../db/main.db"
+var globalDB *sql.DB = nil
 
 func bootstrapDB() {
 	var dbFileExists bool = createDB()
@@ -44,27 +45,51 @@ func fileExists(filename string) bool {
 func connectDb(dbFile string) *sql.DB{
 	db,_:= sql.Open("sqlite3", dbFile)
 	fmt.Println("Connected to DB")
+	globalDB = db
 	return db
 }
+//ADD PUBLIC USERKEYS ASSOCIATED WITH A USERNAME 
 
 func formatDB(db *sql.DB) *sql.DB{
-	format,_ := db.Prepare("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT, passwordHash TEXT)")
+	format,_:= db.Prepare("CREATE TABLE IF NOT EXISTS grps (id INTEGER PRIMARY KEY, grp TEXT, key TEXT)")
 	format.Exec()
+	format,_= db.Prepare("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY, message TEXT, grp TEXT, FOREIGN KEY(grp) REFERENCES grps(grp))")
+	format.Exec()
+	fmt.Println("Data table created")
 	fmt.Println("DB Formatted")
 	return db
 }
 
 func testDB(db *sql.DB) {
-		insert, _:= db.Prepare("INSERT INTO users (username, passwordHash) VALUES (?,?)")
-	insert.Exec("another", "another")
-
-	rows,_:= db.Query("SELECT id, username, passwordHash from users")
+	insert,_:=db.Prepare("INSERT INTO grps (grp, key) VALUES (?,?)")
+	insert.Exec("testing", "1")
+	insert,_= db.Prepare("INSERT INTO messages (message, grp) VALUES (?,?)")
+	insert.Exec("message","testgroup")
+	messages,_:= db.Query("SELECT id, grp, key FROM grps")
 	var id int
-	var username string
-	var passwordHash string
+	var grp string
+	var key string
 
-	for rows.Next() {
-		rows.Scan(&id, &username, &passwordHash)
-		fmt.Println(id,username,passwordHash)
+	for messages.Next() {
+		messages.Scan(&id,&grp,&key)
+		fmt.Println(id,grp,key)
 	}
+
+	fmt.Println(getGrpKey("testing"))
+
+
+}
+
+func getGrpsMessages(grp string, key string) {
+	queryKey,_:= globalDB.Prepare("SELECT key FROM messages WHERE grp=?")
+	queryKey.Exec(grp)
+}
+
+func getGrpKey(grp string) string {
+	var key string = "22"
+	query,_:=globalDB.Query("SELECT key FROM grps WHERE grp=$1", grp)
+	for query.Next() {
+		query.Scan(&key)
+	}
+	return key
 }
